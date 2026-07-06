@@ -1,6 +1,125 @@
+# 🏛️ Shekinah AI Portal — Цитадель Духа
+> **Мультипровайдерный ИИ-Чат на Streamlit & Python**
+
+[![Deploy to Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/)
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://www.netlify.com/)
+
+Интеллектуальная Обитель Цитадели Духа — это локальный и облачный веб-интерфейс для ведения глубоких, академических диалогов с передовыми языковыми моделями семейств **Google Gemini**, **Anthropic Claude** и **Mistral AI**. Портал оформлен в строгом темном минимализме, оптимизирован для Arch Linux и готов к развертыванию.
+
+---
+
+## 🚀 1. Локальный запуск и настройка
+
+### Клонирование репозитория
+Склонируйте проект из удаленной обители в локальный каталог:
+```bash
+git clone https://gitlab.com/webarystan/ai-chat-app.git
+cd ai-chat-app
+```
+
+### Настройка окружения
+Проект поддерживает автоматическую активацию виртуальной среды с помощью `direnv`. 
+
+1. **Метод через Direnv (Рекомендуемый для Arch Linux + Fish)**:
+   * Убедитесь, что `direnv` установлен и хук добавлен в `~/.config/fish/config.fish` (`direnv hook fish | source`).
+   * В корне проекта файл `.envrc` должен содержать `layout python`.
+   * Разрешите выполнение:
+     ```bash
+     direnv allow
+     ```
+   * Окружение активируется автоматически при переходе в папку проекта.
+
+2. **Классический метод (Ручной)**:
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate.fish  # Для Fish shell
+   # или source .venv/bin/activate для Bash/Zsh
+   ```
+
+### Установка зависимостей
+```bash
+pip install -r requirements.txt
+```
+
+### Настройка ключей доступа
+Создайте в корне файл `.env` (он находится в `.gitignore` и защищен от утечек) и добавьте ваши секретные ключи доступа к API:
+```env
+GEMINI_API_KEY=your_gemini_key_here
+ANTHROPIC_API_KEY=your_anthropic_key_here
+MISTRAL_API_KEY=your_mistral_key_here
+```
+
+### Запуск приложения
+```bash
+streamlit run app.py
+```
+*После запуска интерфейс будет доступен в браузере по адресу `http://localhost:8501`.*
+
+---
+
+## 💾 2. Синхронизация с GitLab & GitHub
+
+Если вам необходимо сохранять проект в двух независимых обителях (GitLab и GitHub) одновременно, настройте удаленные репозитории.
+
+### Настройка двух remotes
+1. Убедитесь, что `origin` указывает на GitLab:
+   ```bash
+   git remote set-url origin https://gitlab.com/webarystan/ai-chat-app.git
+   ```
+2. Добавьте зеркало на GitHub (замените `your-username` на ваш аккаунт):
+   ```bash
+   git remote add github https://github.com/your-username/ai-chat-app.git
+   ```
+
+### Пуш в обе обители по отдельности
+```bash
+# Отправка на GitLab
+git push origin main
+
+# Отправка на GitHub
+git push github main
+```
+
+### Лайфхак: Пуш в обе обители одной командой
+Вы можете настроить Git так, чтобы при вызове `git push origin` коммиты автоматически уходили на оба сервера:
+```bash
+git remote set-url --add --push origin https://gitlab.com/webarystan/ai-chat-app.git
+git remote set-url --add --push origin https://github.com/your-username/ai-chat-app.git
+```
+*Теперь простой вызов `git push origin main` отправит изменения и на GitLab, и на GitHub.*
+
+---
+
+## 🌐 3. Развертывание в облаке (Deploy)
+
+### 3.1. Streamlit Community Cloud (Нативно и бесплатно)
+Это самый надежный способ развернуть Streamlit-приложение, так как платформа предоставляет постоянный серверный процесс.
+
+1. Загрузите проект в публичный или приватный репозиторий на **GitHub** (Streamlit Cloud тесно интегрирован именно с GitHub).
+2. Авторизуйтесь на [share.streamlit.io](https://share.streamlit.io/).
+3. Нажмите кнопку **New app**, выберите ваш репозиторий, ветку `main` и укажите главный файл: `app.py`.
+4. Нажмите на иконку шестеренки (Advanced settings), перейдите в раздел **Secrets** и скопируйте туда содержимое вашего `.env`:
+   ```toml
+   GEMINI_API_KEY = "your_key"
+   ANTHROPIC_API_KEY = "your_key"
+   MISTRAL_API_KEY = "your_key"
+   ```
+5. Нажмите **Deploy**. Через 1–2 минуты ваша Цитадель будет доступна в сети.
+
+### 3.2. Vercel и Netlify (Особенности Serverless)
+> ⚠️ **Важное техническое предупреждение:**
+> Платформы Vercel и Netlify спроектированы под **Serverless-архитектуру** (бессерверные функции) и хостинг статических сайтов. Streamlit требует постоянного двустороннего WebSocket-соединения с работающим в фоне процессом Python. Поэтому запустить Streamlit на Vercel или Netlify «из коробки» напрямую невозможно — сессия будет обрываться по таймауту.
+
+Если вам критически необходимо развернуть приложение именно там:
+* **Способ для Vercel**: Используйте специальный шаблон с конфигурацией `vercel.json`, перенаправляющий запросы через бессерверный runtime Python (например, `@vercel/python`). Однако это может повлечь ограничения по времени выполнения функций (обычно 10-60 секунд на генерацию).
+* **Альтернатива через Docker**: Рекомендуется развернуть Docker-контейнер на хостинг-платформах типа **Render**, **Railway** или **Fly.io**, которые предоставляют полноценный VPS-процесс для Python-приложений.
+
+---
+
+***
+
 # AI Oracle
-
-
 
 ## Getting started
 
@@ -15,14 +134,14 @@ Already a pro? Just edit this README.md and make it your own. Want to make it ea
 
 ```
 cd existing_repo
-git remote add origin https://gitlab.com/webarystan/ai-oracle.git
+git remote add origin https://gitlab.com/webarystan/ai-chat-app.git
 git branch -M main
 git push -uf origin main
 ```
 
 ## Integrate with your tools
 
-* [Set up project integrations](https://gitlab.com/webarystan/ai-oracle/-/settings/integrations)
+* [Set up project integrations](https://gitlab.com/webarystan/ai-chat-app/-/settings/integrations)
 
 ## Collaborate with your team
 
