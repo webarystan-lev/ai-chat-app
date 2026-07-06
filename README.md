@@ -124,94 +124,137 @@ git remote set-url --add --push origin https://github.com/your-username/ai-chat-
 
 ***
 
-# AI Oracle
+---
 
-## Getting started
+## 🏛️ 4. Интеграция базы данных Convex DB
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+Проект **Shekinah AI Portal** оснащен реактивной системой облачной синхронизации диалогов и реплик на базе **Convex DB** с автоматическим механизмом "Мягкого Отката" (Graceful Fallback) в автономный In-Memory режим.
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+Ниже приведено исчерпывающее техническое руководство по интеграции, настройке и запуску Convex DB в связке с Python/Streamlit проектами. Оно призвано сохранить драгоценный опыт и уберечь будущие проекты от типичных ошибок.
 
-## Add your files
+### 🧭 Пошаговый алгоритм развертывания с нуля
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
-
+#### Шаг 1. Создание манифеста `package.json`
+Поскольку Convex CLI зародился в экосистеме Node.js, для его работы в корне Python-проекта обязательно должен присутствовать файл `package.json` (иначе CLI падает с ошибкой `ENOENT: no such file or directory, open 'package.json'`).
+Создайте в корне проекта файл `package.json` следующего содержания:
+```json
+{
+  "name": "ai-chat-app",
+  "version": "1.0.0",
+  "description": "Shekinah AI Portal - Цитадель Духа DB Backend configuration",
+  "main": "index.js",
+  "scripts": {
+    "convex:dev": "npx convex dev"
+  },
+  "dependencies": {
+    "convex": "^1.42.1"
+  },
+  "private": true
+}
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/webarystan/ai-chat-app.git
-git branch -M main
-git push -uf origin main
+
+#### Шаг 2. Локальная установка Node-зависимостей
+Для сборки (бандлинга) TypeScript-функций бэкенда Convex CLI использует сверхбыстрый компилятор `esbuild`. Этот компилятор во время сборки ищет импортируемые модули (такие как `"convex/server"`) локально.
+Чтобы избежать ошибки `esbuild failed: Could not resolve "convex/server"`, выполните установку зависимостей в корне проекта:
+```bash
+npm install
+```
+Это создаст локальную папку `node_modules/` с необходимым пакетом `convex`.
+
+#### Шаг 3. Защита Git-репозитория (.gitignore)
+Чтобы Node-зависимости и временные файлы сборки бэкенда не попали в священный Git-репозиторий, добавьте в конец `.gitignore` следующие строки:
+```gitignore
+# ─── CONVEX & NODEJS (БЭКЕНД СИНХРОНИЗАЦИИ) ───────────────────────────────────
+node_modules/
+.convex/
+convex/_generated/
+package-lock.json
 ```
 
-## Integrate with your tools
+#### Шаг 4. Установка Python SDK
+Убедитесь, что в Вашем Python виртуальном окружении установлена библиотека `convex` (версии `0.7.0` или выше):
+```bash
+pip install -r requirements.txt
+```
 
-* [Set up project integrations](https://gitlab.com/webarystan/ai-chat-app/-/settings/integrations)
+#### Шаг 5. Запуск инициализации бэкенда
+Запустите команду разработки в терминале:
+```bash
+npx convex dev
+```
+Следуйте инструкциям на экране. CLI предложит Вам войти в панель управления Convex, автоматически создаст проект (например, `ai-chat-app-75d1f`), скомпилирует TypeScript-схемы из Вашей папки `convex/` и развернет их в облаке. 
 
-## Collaborate with your team
+По окончании процесса CLI сгенерирует файл `.env.local` и выдаст строку подключения (Client URL), например:
+`https://basic-toucan-65.eu-west-1.convex.cloud`.
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+#### Шаг 6. Настройка переменных окружения
+Скопируйте выданный Client URL и пропишите его в локальный файл `.env` в корне проекта:
+```env
+CONVEX_URL=https://ваш_адрес_бэкенда.convex.cloud
+```
 
-## Test and Deploy
+---
 
-Use the built-in continuous integration in GitLab.
+### ⚠️ Важнейшие подводные камни и их архитектурные решения
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+При интеграции Convex DB в Python/Streamlit проекты мы столкнулись и успешно решили два сложнейших технических барьера. Пожалуйста, всегда учитывайте их при масштабировании на другие проекты:
 
-***
+#### 1. Ограничение СУБД на имена индексов (`IndexNameReserved`)
+* **Проблема**: При попытке создать индекс по полю `id` в таблице `chats` с именем `"by_id"`, Convex выдал ошибку: `In table "chats" cannot name an index "by_id" because the name is reserved`. Выяснилось, что имена `by_id` и `by_creation_time` зарезервированы платформой под внутренние нужды.
+* **Решение**: Индекс по строковому UUID диалога переименован во вполне логичное имя **`by_uuid`**:
+  * В схеме данных (`convex/schema.ts`):
+    ```typescript
+    chats: defineTable({ ... }).index("by_uuid", ["id"]),
+    ```
+  * В мутациях манипулирования чатами (`convex/chats.ts`):
+    ```typescript
+    const existing = await ctx.db
+        .query("chats")
+        .withIndex("by_uuid", (q) => q.eq("id", args.id))
+        .unique();
+    ```
 
-# Editing this README
+#### 2. Столкновение пространств имён Python (Namespace Collision)
+* **Проблема**: В Python при поиске модулей в первую очередь просматривается корень проекта (`sys.path[0]`). Поскольку папка с TypeScript-схемами бэкенда называется **`convex/`**, при вызове `from convex import ConvexClient` Python ошибочно импортировал локальную папку бэкенда как пустой namespace-модуль, вместо того чтобы заглянуть в `site-packages` виртуального окружения. Это приводило к скрытой ошибке `ImportError: cannot import name 'ConvexClient'`.
+* **Решение**: Внедрен изящный и надежный обходной путь (bypass) в конструкторе класса `ConvexBridge` (`providers/convex_client.py`). Перед импортом мы временно исключаем пути корня проекта из `sys.path`, импортируем настоящий `ConvexClient` из виртуального окружения и мгновенно возвращаем исходный `sys.path` на место:
+  ```python
+  try:
+      import sys
+      import os
+      orig_path = list(sys.path)
+      
+      # Временно удаляем локальные папки из путей поиска
+      sys.path = [
+          p for p in sys.path 
+          if os.path.abspath(p) not in (
+              os.path.abspath('.'), 
+              os.path.abspath(os.getcwd()), 
+              os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+          )
+      ]
+      
+      from convex import ConvexClient
+      sys.path = orig_path # Возвращаем оригинальные пути
+      
+      self.client = ConvexClient(self.convex_url)
+      self.is_active = True
+  except Exception as e:
+      if 'orig_path' in locals():
+          sys.path = orig_path
+      self.is_active = False
+  ```
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+#### 3. Таймаут инициализации окружения (`load_dotenv()`)
+* **Проблема**: Переменная `CONVEX_URL` в файле `.env` не считывалась на раннем этапе загрузки приложения, из-за чего мост инициализировался в пассивном In-Memory режиме.
+* **Решение**: Вызовы `load_dotenv()` добавлены на самые первые строки файлов `app.py` и `providers/convex_client.py` в обязательном порядке.
 
-## Suggestions for a good README
+---
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+## 🏛️ 5. Текущий статус проекта
 
-## Name
-Choose a self-explaining name for your project.
+* **База данных**: Успешно развернута в облаке Convex DB. Схемы данных валидированы, индексы скомпилированы.
+* **Синхронизация**: Полностью отлажена. Создание, удаление, переименование чатов и реактивная запись сообщений работают синхронно в реальном времени.
+* **Мягкий откат**: Работает штатно. При отсутствии интернета или удалении переменной `CONVEX_URL` из `.env` приложение бесшовно продолжает работу в оперативной памяти (In-Memory).
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+*«Устрой пути свои пред Господом, и помыслы твои совершатся» (Притчи 16:3).*
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
