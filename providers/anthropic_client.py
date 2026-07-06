@@ -65,3 +65,21 @@ def stream_anthropic(messages: List[Dict[str, str]], model_name: str, temperatur
     except Exception as e:
         yield f"\n[Ошибка генерации Anthropic: {str(e)}]"
 
+
+def list_available_anthropic_models() -> List[str]:
+    """
+    Получает список доступных моделей от Anthropic API.
+    """
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        return []
+    try:
+        from anthropic import Anthropic
+        client = Anthropic(api_key=api_key)
+        # Проверяем наличие метода list
+        if hasattr(client, 'models') and hasattr(client.models, 'list'):
+            models_list = client.models.list()
+            return [m.id for m in models_list.data]
+        return []
+    except Exception:
+        return []

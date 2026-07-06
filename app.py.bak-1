@@ -20,26 +20,12 @@ importlib.reload(gemini_client)
 importlib.reload(anthropic_client)
 importlib.reload(mistral_client)
 
-# Инициализируем состояние боковой панели (сворачивание/разворачивание)
-if "sidebar_state" not in st.session_state:
-    st.session_state.sidebar_state = "expanded"
-if "sidebar_action" not in st.session_state:
-    st.session_state.sidebar_action = None
-
-# Хранилище динамических списков моделей в рамках сессии конкретного пользователя
-if "gemini_models" not in st.session_state:
-    st.session_state.gemini_models = None
-if "anthropic_models" not in st.session_state:
-    st.session_state.anthropic_models = None
-if "mistral_models" not in st.session_state:
-    st.session_state.mistral_models = None
-
 # Устанавливаем конфигурацию страницы с премиальным заголовком и иконкой
 st.set_page_config(
     page_title="Shekinah AI Portal — Цитадель Духа",
     page_icon="🏛️",
     layout="wide",
-    initial_sidebar_state=st.session_state.sidebar_state
+    initial_sidebar_state="expanded"
 )
 
 # Внедряем премиальный CSS стиль для атмосферы строгой темной Цитадели
@@ -202,54 +188,20 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# JS-мост для динамического управления интерфейсом (сворачивание боковой панели и жесткая перезагрузка)
-if st.session_state.sidebar_action:
-    action = st.session_state.sidebar_action
-    st.session_state.sidebar_action = None
-    import streamlit.components.v1 as components
-    components.html(f"""
-        <script>
-        const doc = window.parent.document;
-        if ("{action}" === "collapse") {{
-            const sidebar = doc.querySelector('section[data-testid="stSidebar"]');
-            if (sidebar) {{
-                const closeBtn = sidebar.querySelector('button[aria-label="Close sidebar"]') || 
-                                 sidebar.querySelector('button[aria-label="Close"]') || 
-                                 sidebar.querySelector('button');
-                if (closeBtn) closeBtn.click();
-            }}
-        }} else if ("{action}" === "expand") {{
-            const expandBtn = doc.querySelector('[data-testid="collapsedControl"]');
-            if (expandBtn) expandBtn.click();
-        }} else if ("{action}" === "hard_reload") {{
-            window.parent.localStorage.clear();
-            window.parent.sessionStorage.clear();
-            window.parent.location.reload(true);
-        }}
-        </script>
-    """, height=0, width=0)
-
 # ⚓ Самый верхний якорь всей страницы
 st.markdown("<div id='top_anchor'></div>", unsafe_allow_html=True)
 
-# Рендеринг плавающей нативной панели скролла (через JS для надежного скроллинга)
+# Рендеринг плавающей нативной панели скролла
 st.markdown("""
 <div class="page-scroll-container">
-    <a href="#top_anchor" onclick="try { const d = window.parent.document; const m = d.querySelector('.main') || d.querySelector('[data-testid=stAppViewContainer]') || d.querySelector('section.main'); m.scrollTo({top: 0, behavior: 'smooth'}); return false; } catch(e) { return true; }" class="scroll-anchor-btn" title="На самый верх">▲</a>
-    <a href="#bottom_anchor" onclick="try { const d = window.parent.document; const m = d.querySelector('.main') || d.querySelector('[data-testid=stAppViewContainer]') || d.querySelector('section.main'); m.scrollTo({top: m.scrollHeight || 99999, behavior: 'smooth'}); return false; } catch(e) { return true; }" class="scroll-anchor-btn" title="В самый низ">▼</a>
+    <a href="#top_anchor" class="scroll-anchor-btn" title="На самый верх">▲</a>
+    <a href="#bottom_anchor" class="scroll-anchor-btn" title="В самый низ">▼</a>
 </div>
 """, unsafe_allow_html=True)
 
 # Заголовки на главной странице
 st.markdown("<div class='title-text'>Shekinah AI Portal</div>", unsafe_allow_html=True)
 st.markdown("<div class='subtitle-text'>Интеллектуальная Обитель Цитадели Духа — Мультипровайдерный Диалог</div>", unsafe_allow_html=True)
-
-# Если боковая панель свернута, показываем кнопку для ее развертывания
-if st.session_state.sidebar_state == "collapsed":
-    if st.button("↔️ Развернуть настройки Ордена", key="btn_expand_sidebar"):
-        st.session_state.sidebar_state = "expanded"
-        st.session_state.sidebar_action = "expand"
-        st.rerun()
 
 # ─── НАСТРОЙКИ В БОКОВОЙ ПАНЕЛИ ───
 st.sidebar.markdown("<h2 style='font-family: \"Outfit\", sans-serif; color: #f8fafc; font-weight: 700;'>🏛️ Настройки Ордена</h2>", unsafe_allow_html=True)
@@ -264,58 +216,6 @@ st.sidebar.markdown(f"{'🟢' if anthropic_key else '🔴'} **Anthropic Claude**
 st.sidebar.markdown(f"{'🟢' if mistral_key else '🔴'} **Mistral AI**")
 st.sidebar.markdown("---")
 
-# Дефолтные списки моделей на случай сбоя API
-DEFAULT_GEMINI_MODELS = {
-    "gemini-2.5-flash": "Gemini 2.5 Flash (Рекомендуемая)",
-    "gemini-2.5-flash-lite": "Gemini 2.5 Flash Lite (Оптимизированная)",
-    "gemini-3-flash-preview": "Gemini 3 Flash Preview (Экспериментальная)",
-    "gemini-3.5-flash": "Gemini 3.5 Flash (Новое поколение)",
-    "gemma-4-31b-it": "Gemma 4 31B IT (Google Open Model)",
-    "gemma-4-26b-a4b-it": "Gemma 4 26B A4B IT (Многоязычная)",
-    "gemini-flash-latest": "Gemini Flash Latest (Стремительный Вестник)",
-    "gemini-flash-lite-latest": "Gemini Flash-Lite Latest (Молниеносный Послушник)",
-    "gemini-3.1-flash-lite-preview": "Gemini 3.1 Flash Lite Preview (Вещий Вестник)",
-    "gemini-3.1-flash-lite": "Gemini 3.1 Flash Lite (Хранитель Малого Логоса)"
-}
-
-DEFAULT_ANTHROPIC_MODELS = {
-    "claude-3-5-sonnet-20240620": "Claude 3.5 Sonnet (Классическая)",
-    "claude-haiku-4-5-20251001": "Claude Haiku 4.5 (Молниеносная)",
-    "claude-sonnet-4-5-20250929": "Claude Sonnet 4.5 (Глубокий контекст)",
-    "claude-sonnet-4-6": "Claude Sonnet 4.6 (Премиум баланс)",
-    "claude-opus-4-7": "Claude Opus 4.7 (Высший разум)"
-}
-
-DEFAULT_MISTRAL_MODELS = {
-    "mistral-small-2603": "Mistral Small 2603 (Новейшее быстрое ядро)",
-    "mistral-small-latest": "Mistral Small Latest (Оптимальная)",
-    "mistral-medium-2508": "Mistral Medium 2508 (Стабильный интеллект)",
-    "mistral-medium-2604": "Mistral Medium 2604 (Сверхновая)",
-    "mistral-medium-latest": "Mistral Medium Latest (Сбалансированная)",
-    "codestral-2508": "Codestral 2508 (Специализированный кодинг)",
-    "codestral-latest": "Codestral Latest (Программирование)",
-    "devstral-2512": "Devstral 2512 (Агентская сборка)",
-    "devstral-latest": "Devstral Latest (Разработка)",
-    "mistral-code-agent-latest": "Mistral Code Agent (Инженер кода)",
-    "mistral-large-2512": "Mistral Large 2512 (Флагманский разум)",
-    "mistral-large-latest": "Mistral Large Latest (Верховный европейский флагман)"
-}
-
-def fetch_gemini_models() -> list:
-    if st.session_state.gemini_models is None:
-        st.session_state.gemini_models = gemini_client.list_available_gemini_models()
-    return st.session_state.gemini_models
-
-def fetch_anthropic_models() -> list:
-    if st.session_state.anthropic_models is None:
-        st.session_state.anthropic_models = anthropic_client.list_available_anthropic_models()
-    return st.session_state.anthropic_models
-
-def fetch_mistral_models() -> list:
-    if st.session_state.mistral_models is None:
-        st.session_state.mistral_models = mistral_client.list_available_mistral_models()
-    return st.session_state.mistral_models
-
 # Иерархия чинов и званий всех моделей Цитадели
 CITADEL_RANKS = {
     "gemini-2.5-flash": "Младший Хранитель Света",
@@ -324,10 +224,6 @@ CITADEL_RANKS = {
     "gemini-3.5-flash": "Архивариус Небесных Сфер",
     "gemma-4-31b-it": "Магистр Открытого Знания",
     "gemma-4-26b-a4b-it": "Лингвист Вселенского Единства",
-    "gemini-flash-latest": "Вестник Стремительного Света",
-    "gemini-flash-lite-latest": "Послушник Молниеносной Мысли",
-    "gemini-3.1-flash-lite-preview": "Вещий Вестник Новой Эпохи",
-    "gemini-3.1-flash-lite": "Хранитель Малого Логоса",
     "claude-3-5-sonnet": "Скриптор Мудрости",
     "claude-haiku-4-5": "Вестник Молниеносный",
     "claude-sonnet-4-5": "Хранитель Глубинных Смыслов",
@@ -349,59 +245,43 @@ CITADEL_RANKS = {
 
 provider = st.sidebar.selectbox("Выберите ИИ-Провайдера:", ["Google Gemini", "Anthropic (Claude)", "Mistral AI"])
 
-# 👑 ДИНАМИЧЕСКИЙ ВЫБОР И ОБНОВЛЕНИЕ МОДЕЛЕЙ ИЗ API
+# 👑 ПОЛНОЕ ВОССТАНОВЛЕНИЕ ВСЕХ ДЕСЯТКОВ МОДЕЛЕЙ ОРДЕНА
 if provider == "Google Gemini":
-    dynamic_list = fetch_gemini_models()
-    model_options = {}
-    if dynamic_list:
-        for m in dynamic_list:
-            if m in DEFAULT_GEMINI_MODELS:
-                model_options[m] = DEFAULT_GEMINI_MODELS[m]
-            else:
-                friendly = m.replace("models/", "").replace("-", " ").title()
-                rank = CITADEL_RANKS.get(m, "Новопосвященная модель")
-                model_options[m] = f"✨ {friendly} ({rank})"
-    # Гарантируем наличие базовых моделей
-    for k, v in DEFAULT_GEMINI_MODELS.items():
-        if k not in model_options:
-            model_options[k] = v
-
+    model_options = {
+        "gemini-2.5-flash": "Gemini 2.5 Flash (Рекомендуемая)",
+        "gemini-2.5-flash-lite": "Gemini 2.5 Flash Lite (Оптимизированная)",
+        "gemini-3-flash-preview": "Gemini 3 Flash Preview (Экспериментальная)",
+        "gemini-3.5-flash": "Gemini 3.5 Flash (Новое поколение)",
+        "gemma-4-31b-it": "Gemma 4 31B IT (Google Open Model)",
+        "gemma-4-26b-a4b-it": "Gemma 4 26B A4B IT (Многоязычная)"
+    }
     selected_model_key = st.sidebar.selectbox("Выберите модель:", list(model_options.keys()), format_func=lambda x: model_options[x])
     api_model_name = selected_model_key
-
 elif provider == "Anthropic (Claude)":
-    dynamic_list = fetch_anthropic_models()
-    model_options = {}
-    if dynamic_list:
-        for m in dynamic_list:
-            if m in DEFAULT_ANTHROPIC_MODELS:
-                model_options[m] = DEFAULT_ANTHROPIC_MODELS[m]
-            else:
-                friendly = m.replace("-", " ").title()
-                rank = CITADEL_RANKS.get(m, "Новопосвященная модель")
-                model_options[m] = f"✨ {friendly} ({rank})"
-    for k, v in DEFAULT_ANTHROPIC_MODELS.items():
-        if k not in model_options:
-            model_options[k] = v
-
+    model_options = {
+        "claude-3-5-sonnet-20240620": "Claude 3.5 Sonnet (Классическая)",
+        "claude-haiku-4-5-20251001": "Claude Haiku 4.5 (Молниеносная)",
+        "claude-sonnet-4-5-20250929": "Claude Sonnet 4.5 (Глубокий контекст)",
+        "claude-sonnet-4-6": "Claude Sonnet 4.6 (Премиум баланс)",
+        "claude-opus-4-7": "Claude Opus 4.7 (Высший разум)"
+    }
     selected_model_key = st.sidebar.selectbox("Выберите модель:", list(model_options.keys()), format_func=lambda x: model_options[x])
     api_model_name = selected_model_key
-
 else:
-    dynamic_list = fetch_mistral_models()
-    model_options = {}
-    if dynamic_list:
-        for m in dynamic_list:
-            if m in DEFAULT_MISTRAL_MODELS:
-                model_options[m] = DEFAULT_MISTRAL_MODELS[m]
-            else:
-                friendly = m.replace("-", " ").title()
-                rank = CITADEL_RANKS.get(m, "Новопосвященная модель")
-                model_options[m] = f"✨ {friendly} ({rank})"
-    for k, v in DEFAULT_MISTRAL_MODELS.items():
-        if k not in model_options:
-            model_options[k] = v
-
+    model_options = {
+        "mistral-small-2603": "Mistral Small 2603 (Новейшее быстрое ядро)",
+        "mistral-small-latest": "Mistral Small Latest (Оптимальная)",
+        "mistral-medium-2508": "Mistral Medium 2508 (Стабильный интеллект)",
+        "mistral-medium-2604": "Mistral Medium 2604 (Сверхновая)",
+        "mistral-medium-latest": "Mistral Medium Latest (Сбалансированная)",
+        "codestral-2508": "Codestral 2508 (Специализированный кодинг)",
+        "codestral-latest": "Codestral Latest (Программирование)",
+        "devstral-2512": "Devstral 2512 (Агентская сборка)",
+        "devstral-latest": "Devstral Latest (Разработка)",
+        "mistral-code-agent-latest": "Mistral Code Agent (Инженер кода)",
+        "mistral-large-2512": "Mistral Large 2512 (Флагманский разум)",
+        "mistral-large-latest": "Mistral Large Latest (Верховный европейский флагман)"
+    }
     selected_model_key = st.sidebar.selectbox("Выберите модель:", list(model_options.keys()), format_func=lambda x: model_options[x])
     api_model_name = selected_model_key
 
@@ -426,26 +306,8 @@ default_system = (
 system_prompt = st.sidebar.text_area("Системный промпт (Задание роли):", value=default_system, height=150)
 
 st.sidebar.markdown("---")
-
-# Колонки для очистки истории и кэша
-col_side1, col_side2 = st.sidebar.columns(2)
-with col_side1:
-    if st.button("🧹 Очистить диалог", key="clear_history_btn", help="Сбросить историю текущего диалога"):
-        st.session_state.messages = []
-        st.rerun()
-with col_side2:
-    if st.button("🔄 Сброс и Обновление", key="clear_cache_btn", help="Очистить кэш браузера и сервера, обновить список моделей"):
-        st.session_state.gemini_models = None
-        st.session_state.anthropic_models = None
-        st.session_state.mistral_models = None
-        st.session_state.messages = []
-        st.session_state.sidebar_action = "hard_reload"
-        st.rerun()
-
-# Кнопка сворачивания панели
-if st.sidebar.button("↔️ Свернуть настройки Ордена", key="btn_collapse_sidebar"):
-    st.session_state.sidebar_state = "collapsed"
-    st.session_state.sidebar_action = "collapse"
+if st.sidebar.button("🧹 Очистить историю диалога"):
+    st.session_state.messages = []
     st.rerun()
 
 if "messages" not in st.session_state:
@@ -496,13 +358,9 @@ st.markdown("<div id='chat_anchor'></div>", unsafe_allow_html=True)
 if st.session_state.messages:
     col_sc1, col_sc2 = st.columns(2)
     with col_sc1:
-        st.markdown("""
-            <a href="#top_anchor" onclick="try { const d = window.parent.document; const m = d.querySelector('.main') || d.querySelector('[data-testid=stAppViewContainer]') || d.querySelector('section.main'); m.scrollTo({top: 0, behavior: 'smooth'}); return false; } catch(e) { return true; }" class="chat-nav-link">⬆️ К началу диалога</a>
-        """, unsafe_allow_html=True)
+        st.markdown('<a href="#top_anchor" class="chat-nav-link">⬆️ К началу диалога</a>', unsafe_allow_html=True)
     with col_sc2:
-        st.markdown("""
-            <a href="#chat_anchor" onclick="try { const d = window.parent.document; const m = d.querySelector('.main') || d.querySelector('[data-testid=stAppViewContainer]') || d.querySelector('section.main'); m.scrollTo({top: m.scrollHeight || 99999, behavior: 'smooth'}); return false; } catch(e) { return true; }" class="chat-nav-link">⬇️ К концу диалога</a>
-        """, unsafe_allow_html=True)
+        st.markdown('<a href="#chat_anchor" class="chat-nav-link">⬇️ К концу диалога</a>', unsafe_allow_html=True)
 
 # ─── РАБОТА С НОВЫМ ЗАПРОСОМ ПОЛЬЗОВАТЕЛЯ ───
 if prompt := st.chat_input("Напишите Ваше послание..."):

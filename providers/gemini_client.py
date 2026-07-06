@@ -65,3 +65,17 @@ def stream_gemini(messages: List[Dict[str, str]], model_name: str, temperature: 
     except Exception as e:
         yield f"\n[Ошибка генерации Gemini: {str(e)}]"
 
+
+def list_available_gemini_models() -> List[str]:
+    """
+    Получает список доступных моделей от Google Gemini API.
+    """
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        return []
+    try:
+        genai.configure(api_key=api_key)
+        models = genai.list_models()
+        return [m.name.replace("models/", "") for m in models if "generateContent" in m.supported_generation_methods]
+    except Exception:
+        return []

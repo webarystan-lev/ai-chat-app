@@ -62,3 +62,18 @@ def stream_mistral(messages: List[Dict[str, str]], model_name: str, temperature:
     except Exception as e:
         yield f"\n[Ошибка генерации Mistral: {str(e)}]"
 
+
+def list_available_mistral_models() -> List[str]:
+    """
+    Получает список доступных моделей от Mistral API.
+    """
+    api_key = os.getenv("MISTRAL_API_KEY")
+    if not api_key:
+        return []
+    try:
+        from mistralai.client import Mistral
+        client = Mistral(api_key=api_key)
+        models_list = client.models.list()
+        return [m.id for m in models_list.data]
+    except Exception:
+        return []
