@@ -199,6 +199,16 @@ st.markdown("""
         border-left: 2px solid #334155;
         padding-left: 10px;
     }
+
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+
+    .spinning-icon {
+        display: inline-block;
+        animation: spin 2s linear infinite;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -324,7 +334,7 @@ CITADEL_RANKS = {
     "gemini-3.5-flash": "Архивариус Небесных Сфер",
     "gemma-4-31b-it": "Магистр Открытого Знания",
     "gemma-4-26b-a4b-it": "Лингвист Вселенского Единства",
-    "gemini-flash-latest": "Вестник Стремительного Света",
+    "gemini-flash-latest": "Вестник Света",
     "gemini-flash-lite-latest": "Послушник Молниеносной Мысли",
     "gemini-3.1-flash-lite-preview": "Вещий Вестник Новой Эпохи",
     "gemini-3.1-flash-lite": "Хранитель Малого Логоса",
@@ -464,15 +474,27 @@ def copy_action(text_to_copy):
 for idx, msg in enumerate(st.session_state.messages):
     if msg["role"] != "system":
         with st.chat_message(msg["role"]):
-            # Вывод сокрытых мыслей в свернутом спойлере
-            if msg["role"] == "assistant" and "thinking" in msg and msg["thinking"]:
-                thinking_html = f"""
-                <details class="thinking-container">
-                    <summary class="thinking-summary">🧠 Размышления модели (Развернуть)</summary>
-                    <div class="thinking-content">{msg["thinking"]}</div>
-                </details>
-                """
-                st.markdown(thinking_html, unsafe_allow_html=True)
+            # Вывод сокрытых мыслей и таймера в свернутом спойлере
+            if msg["role"] == "assistant":
+                has_thinking = "thinking" in msg and msg["thinking"]
+                has_duration = "meta" in msg and msg["meta"] and "duration" in msg["meta"]
+                
+                if has_thinking or has_duration:
+                    thinking_text = ""
+                    if has_duration:
+                        thinking_text += f"⏳ **Время размышления**: {msg['meta']['duration']:.2f} сек.\n"
+                    if has_thinking:
+                        if has_duration:
+                            thinking_text += "\n---\n"
+                        thinking_text += msg["thinking"]
+
+                    thinking_html = f"""
+                    <details class="thinking-container">
+                        <summary class="thinking-summary">🧠 Процесс размышления модели (Развернуть)</summary>
+                        <div class="thinking-content">{thinking_text}</div>
+                    </details>
+                    """
+                    st.markdown(thinking_html, unsafe_allow_html=True)
 
             # Основной текст сообщения
             st.markdown(msg["content"])
@@ -509,6 +531,7 @@ if prompt := st.chat_input("Напишите Ваше послание..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.rerun()
 
+# ... (Генерация ответа полностью продублирована и находится ниже)
 # Генерация ответа
 if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
     messages_to_send = []
@@ -519,12 +542,32 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "user"
         if msg["role"] != "system":
             messages_to_send.append({"role": msg["role"], "content": msg["content"]})
 
+    import time
+
     with st.chat_message("assistant"):
+        # Внедряем временную CSS анимацию вращения для аватара текущего (последнего) сообщения
+        spinner_css = st.markdown("""
+        <style>
+            [data-testid="stChatMessageAssistant"]:last-of-type div[data-testid="chatAvatarIcon-assistant"],
+            [data-testid="stChatMessageAssistant"]:last-of-type div[data-testid="stChatMessageAvatarAssistant"],
+            [data-testid="stChatMessageAssistant"]:last-of-type span[data-testid="stChatMessageAvatarAssistant"],
+            [data-testid="stChatMessageAssistant"]:last-of-type .stAvatar,
+            [data-testid="stChatMessageAssistant"]:last-of-type div[data-testid="stChatMessageAvatarAssistant"] > div {
+                animation: spin 2s linear infinite !important;
+                filter: drop-shadow(0 0 8px #3b82f6);
+            }
+        </style>
+        """, unsafe_allow_html=True)
+
+        status_placeholder = st.empty()
         response_placeholder = st.empty()
         full_response = ""
         extracted_thinking = ""
+        elapsed_total = 0.0
 
         try:
+            start_time = time.time()
+            
             if provider == "Google Gemini":
                 generator = gemini_client.stream_gemini(messages=messages_to_send, model_name=api_model_name, temperature=temperature, max_tokens=max_tokens)
             elif provider == "Anthropic (Claude)":
@@ -534,7 +577,20 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "user"
 
             for chunk in generator:
                 full_response += chunk
+                elapsed_total = time.time() - start_time
+                status_placeholder.markdown(f"""
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px; background: rgba(59, 130, 246, 0.05); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2); width: fit-content;">
+                    <span class="spinning-icon" style="font-size: 1.2rem; display: inline-block; line-height: 1;">🌀</span>
+                    <span style="color: #94a3b8; font-size: 0.9rem; font-family: 'Inter', sans-serif;">
+                        Размышление и вещание... <strong style="color: #60a5fa; font-family: 'Outfit', sans-serif;">{elapsed_total:.1f} сек.</strong>
+                    </span>
+                </div>
+                """, unsafe_allow_html=True)
                 response_placeholder.markdown(full_response + "▌")
+
+            elapsed_total = time.time() - start_time
+            # Отключаем временный спиннер аватара
+            spinner_css.empty()
 
             # Эмуляция отделения мыслей (если модель возвращает их в тегах или пометках)
             if "<thinking>" in full_response and "</thinking>" in full_response:
@@ -542,14 +598,30 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "user"
                 extracted_thinking = parts[0].replace("<thinking>", "").strip()
                 full_response = parts[1].strip()
 
+            # Выводим финальный свернутый блок размышлений модели прямо в интерфейс
+            thinking_text = f"⏳ **Время размышления**: {elapsed_total:.2f} сек."
+            if extracted_thinking:
+                thinking_text += f"\n\n---\n\n{extracted_thinking}"
+
+            thinking_html = f"""
+            <details class="thinking-container">
+                <summary class="thinking-summary">🧠 Процесс размышления модели (Развернуть)</summary>
+                <div class="thinking-content">{thinking_text}</div>
+            </details>
+            """
+            status_placeholder.markdown(thinking_html, unsafe_allow_html=True)
+
             rank = CITADEL_RANKS.get(selected_model_key, "Агент Цитадели")
             friendly_model_name = model_options.get(selected_model_key, selected_model_key)
             signature = f"\n\n---\n*С глубоким почтением, {friendly_model_name} — {rank}*"
             response_placeholder.markdown(full_response + signature)
 
         except Exception as e:
+            spinner_css.empty()
+            elapsed_total = time.time() - start_time
             full_response = f"⚠️ Произошла непредвиденная ошибка на стороне портала: {str(e)}"
             response_placeholder.markdown(full_response)
+            status_placeholder.markdown(f"⏳ **Время генерации (сбой)**: {elapsed_total:.2f} сек.")
 
     st.session_state.messages.append({
         "role": "assistant",
@@ -557,7 +629,8 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "user"
         "thinking": extracted_thinking,
         "meta": {
             "model_key": selected_model_key,
-            "model_options": model_options
+            "model_options": model_options,
+            "duration": elapsed_total
         }
     })
     st.rerun()
