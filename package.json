@@ -4,7 +4,8 @@
   "description": "Shekinah AI Portal - Цитадель Духа DB Backend configuration",
   "main": "index.js",
   "scripts": {
-    "convex:dev": "npx convex dev"
+    "convex:dev": "npx convex dev",
+    "dev": "streamlit run app.py"
   },
   "dependencies": {
     "convex": "^1.42.1"
