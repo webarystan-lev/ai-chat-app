@@ -53,6 +53,8 @@ pip install -r requirements.txt
 GEMINI_API_KEY=your_gemini_key_here
 ANTHROPIC_API_KEY=your_anthropic_key_here
 MISTRAL_API_KEY=your_mistral_key_here
+VITE_CONVEX_URL=https://basic-toucan-65.eu-west-1.convex.cloud
+CONVEX_URL=https://basic-toucan-65.eu-west-1.convex.cloud
 ```
 
 ### Запуск приложения
