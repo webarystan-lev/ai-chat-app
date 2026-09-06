@@ -98,6 +98,10 @@
     * Реализован полиморфный опрос доступных моделей (`supported_actions` / `supported_generation_methods`).
     * Список `DEFAULT_GEMINI_MODELS` в `app.py` обогащен новейшими моделями `gemini-2.5-pro` (Верховный ИИ-Архитектор) и `gemini-3.6-flash` (Академический Соратник).
     * Провайдеры Anthropic и Mistral приведены к единому стандарту санации Markdown.
+18. **Развёртывание Всеобъемлющего Тестового Контура (`tests/`)**:
+    * По эталону проекта `citadel-oracle-pim` реализован и запущен набор из 46 модульных и интеграционных тестов на базе `unittest` (`test_gatekeeper_auth.py`, `test_security.py`, `test_ai_providers.py`, `test_convex_bridge.py`).
+    * Тесты покрывают двухступенчатого Стража Врат («Ключ Премудрости»), криптографию AES-256 Fernet, санитизацию Markdown, потоковую генерацию всех трёх ИИ-провайдеров и синхронизацию с Convex DB (Fallback и Active CRUD).
+    * Все 46 тестов проходят со 100% успехом (Ran 46 tests in 0.5s, OK).
 
 ---
 

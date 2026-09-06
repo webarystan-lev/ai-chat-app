@@ -89,3 +89,22 @@ def verify_gemini_api_key(api_key: str) -> tuple[bool, str]:
         if "API_KEY_INVALID" in err_msg or "400" in err_msg or "403" in err_msg:
             return False, "API-ключ Google Gemini недействителен или заблокирован."
         return False, f"Ошибка проверки API-ключа Google: {err_msg[:120]}"
+
+
+def get_secret(key_name: str) -> str:
+    """
+    Извлекает секрет с приоритетом:
+    1. Переменные окружения ОС / .env (os.getenv)
+    2. Streamlit Secrets на облачном хостинге (st.secrets)
+    """
+    val = os.getenv(key_name)
+    if val:
+        return val.strip()
+    try:
+        import streamlit as st
+        if hasattr(st, "secrets") and key_name in st.secrets:
+            return str(st.secrets[key_name]).strip()
+    except Exception:
+        pass
+    return ""
+

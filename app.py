@@ -2,6 +2,7 @@ import sys
 import os
 import importlib
 import uuid
+import time
 from dotenv import load_dotenv
 
 # Загружаем переменные окружения из .env в самом начале
@@ -14,6 +15,7 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 import streamlit as st
 from providers import anthropic_client, gemini_client, mistral_client
 from providers.convex_client import ConvexBridge
+from providers.security import verify_gemini_api_key, sanitize_markdown, get_secret
 
 # Попытка импорта надежного кроссплатформенного буфера обмена
 try:
@@ -216,6 +218,7 @@ st.markdown("""
         font-size: 2.8rem;
         margin-bottom: 0.2rem;
         text-shadow: 0 0 20px rgba(168, 85, 247, 0.2);
+        text-align: center !important;
     }
 
     .subtitle-text {
@@ -225,6 +228,7 @@ st.markdown("""
         margin-bottom: 2rem;
         font-weight: 300;
         letter-spacing: 0.5px;
+        text-align: center !important;
     }
 
     /* Стильные карточки сообщений */
@@ -355,6 +359,165 @@ st.markdown("""
         display: inline-block;
         animation: spin 2s linear infinite;
     }
+
+    /* ─── АВТОРИЗАЦИЯ И СИЯЮЩИЕ ЗАГОЛОВКИ ЦИТАДЕЛИ ─── */
+    .login-header-container {
+        text-align: center !important;
+        margin-top: 1.5rem !important;
+        margin-bottom: 2rem !important;
+        width: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    .login-title {
+        font-family: 'Outfit', sans-serif !important;
+        font-size: 3.2rem !important;
+        font-weight: 800 !important;
+        letter-spacing: 1.5px !important;
+        margin-bottom: 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 0.75rem !important;
+        flex-wrap: wrap !important;
+        text-align: center !important;
+    }
+
+    /* 1. Слово Shekinah: циклический перелив 3 цветов (Золото -> Пламенный Рубин -> Царственный Пурпур -> Золото) */
+    @keyframes shekinahColorCycle {
+        0% {
+            background-position: 0% 50%;
+            filter: drop-shadow(0 0 16px rgba(251, 191, 36, 0.5));
+        }
+        50% {
+            background-position: 100% 50%;
+            filter: drop-shadow(0 0 24px rgba(244, 63, 94, 0.65));
+        }
+        100% {
+            background-position: 0% 50%;
+            filter: drop-shadow(0 0 16px rgba(251, 191, 36, 0.5));
+        }
+    }
+
+    .word-shekinah {
+        background: linear-gradient(90deg, #fbbf24 0%, #f43f5e 33.3%, #c084fc 66.6%, #fbbf24 100%);
+        background-size: 300% 100%;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: shekinahColorCycle 7s ease-in-out infinite;
+        display: inline-block;
+        will-change: background-position;
+    }
+
+    /* 2. Слово AI: циклический перелив 3 цветов (Неоновый Циан -> Электрический Лазурный -> Изумрудная Бирюза -> Неоновый Циан) */
+    @keyframes aiColorCycle {
+        0% {
+            background-position: 0% 50%;
+            filter: drop-shadow(0 0 16px rgba(34, 211, 238, 0.5));
+        }
+        50% {
+            background-position: 100% 50%;
+            filter: drop-shadow(0 0 24px rgba(59, 130, 246, 0.65));
+        }
+        100% {
+            background-position: 0% 50%;
+            filter: drop-shadow(0 0 16px rgba(34, 211, 238, 0.5));
+        }
+    }
+
+    .word-ai {
+        background: linear-gradient(90deg, #22d3ee 0%, #3b82f6 33.3%, #10b981 66.6%, #22d3ee 100%);
+        background-size: 300% 100%;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: aiColorCycle 6s ease-in-out infinite;
+        display: inline-block;
+        will-change: background-position;
+    }
+
+    /* 3. Слово Portal: циклический перелив 3 цветов (Фиолетовый -> Неоновая Фуксия -> Индиго -> Фиолетовый) */
+    @keyframes portalColorCycle {
+        0% {
+            background-position: 0% 50%;
+            filter: drop-shadow(0 0 16px rgba(168, 85, 247, 0.5));
+        }
+        50% {
+            background-position: 100% 50%;
+            filter: drop-shadow(0 0 24px rgba(244, 114, 182, 0.65));
+        }
+        100% {
+            background-position: 0% 50%;
+            filter: drop-shadow(0 0 16px rgba(168, 85, 247, 0.5));
+        }
+    }
+
+    .word-portal {
+        background: linear-gradient(90deg, #a855f7 0%, #f472b6 33.3%, #6366f1 66.6%, #a855f7 100%);
+        background-size: 300% 100%;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: portalColorCycle 7s ease-in-out infinite;
+        display: inline-block;
+        will-change: background-position;
+    }
+
+    /* Слоган в оранжево-бирюзовой гамме */
+    .login-subtitle {
+        font-family: 'Inter', sans-serif !important;
+        background: linear-gradient(90deg, #f97316 0%, #fbbf24 35%, #2dd4bf 70%, #38bdf8 100%) !important;
+        -webkit-background-clip: text !important;
+        -webkit-text-fill-color: transparent !important;
+        font-size: 1.18rem !important;
+        font-weight: 500 !important;
+        letter-spacing: 0.8px !important;
+        margin-top: 0.4rem !important;
+        margin-bottom: 2rem !important;
+        text-align: center !important;
+        line-height: 1.6 !important;
+        max-width: 820px !important;
+        filter: drop-shadow(0 0 12px rgba(45, 212, 191, 0.3)) !important;
+    }
+
+    /* Центрированная форма входа со стеклянным фоном */
+    div[data-testid="stForm"] {
+        background: rgba(15, 23, 42, 0.82) !important;
+        border: 1px solid rgba(45, 212, 191, 0.28) !important;
+        border-radius: 18px !important;
+        padding: 2.2rem !important;
+        box-shadow: 0 16px 40px -6px rgba(0, 0, 0, 0.6), 0 0 25px rgba(249, 115, 22, 0.15) !important;
+        backdrop-filter: blur(14px) !important;
+    }
+
+    /* Оранжево-бирюзовая кнопка входа «🏛️ Войти в Цитадель» */
+    div[data-testid="stForm"] button {
+        background: linear-gradient(135deg, #f97316 0%, #d97706 30%, #0d9488 70%, #06b6d4 100%) !important;
+        color: #ffffff !important;
+        font-family: 'Outfit', sans-serif !important;
+        font-weight: 700 !important;
+        font-size: 1.15rem !important;
+        letter-spacing: 1px !important;
+        border: 1px solid rgba(251, 146, 60, 0.4) !important;
+        border-radius: 12px !important;
+        padding: 0.8rem 1.6rem !important;
+        box-shadow: 0 4px 20px rgba(249, 115, 22, 0.38), 0 0 15px rgba(6, 182, 212, 0.25) !important;
+        transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+
+    div[data-testid="stForm"] button:hover {
+        background: linear-gradient(135deg, #fb923c 0%, #ea580c 30%, #14b8a6 70%, #22d3ee 100%) !important;
+        box-shadow: 0 6px 30px rgba(249, 115, 22, 0.6), 0 0 25px rgba(45, 212, 191, 0.5) !important;
+        transform: translateY(-2px) !important;
+        border-color: rgba(45, 212, 191, 0.6) !important;
+        color: #ffffff !important;
+    }
+
+    div[data-testid="stForm"] button:active {
+        transform: translateY(0px) !important;
+        box-shadow: 0 2px 10px rgba(249, 115, 22, 0.3) !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -388,6 +551,73 @@ if st.session_state.sidebar_action:
 # ⚓ Самый верхний якорь всей страницы
 st.markdown("<div id='top_anchor'></div>", unsafe_allow_html=True)
 
+# ─── АВТОРИЗАЦИЯ И СТРАЖ ВРАТ ЦИТАДЕЛИ (ТОЛЬКО ПО GEMINI_API_KEY) ───
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+def render_login_screen():
+    st.markdown("""
+    <div class="login-header-container">
+        <h1 class="login-title">
+            <span class="word-shekinah">Shekinah</span>
+            <span class="word-ai">AI</span>
+            <span class="word-portal">Portal</span>
+        </h1>
+        <p class="login-subtitle">
+            Интеллектуальная Обитель Цитадели Духа — Мультипровайдерный Диалог
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 1.8, 1])
+    with col2:
+        with st.form("login_form"):
+            st.markdown("<h3 style='text-align: center; font-family: \"Outfit\", sans-serif; color: #f8fafc; font-weight: 700; margin-bottom: 1.2rem;'>🛡️ Вход Создателя</h3>", unsafe_allow_html=True)
+            
+            gemini_input = st.text_input(
+                "🗝️ Ключ Премудрости Цитадели", 
+                type="password", 
+                value="", 
+                placeholder="Вложите сокровенный шифр Врат...",
+                help="«Отворяет — и никто не затворит». Доступ открыт исключительно Создателю Цитадели."
+            )
+            
+            submit = st.form_submit_button("🏛️ Войти в Цитадель", use_container_width=True)
+            
+            if submit:
+                clean_key = gemini_input.strip() if gemini_input else ""
+                if not clean_key:
+                    st.error("🔴 Врата затворены: введите ключ доступа.")
+                    return
+                
+                # ── СТУПЕНЬ I: Сверка на идентичность с серверным эталоном (.env / Secrets) ──
+                master_key = get_secret("GEMINI_API_KEY") or get_secret("GOOGLE_API_KEY")
+                if not master_key:
+                    st.error("⚠️ Внутренняя ошибка: мастер-шифр сервера не сконфигурирован.")
+                    return
+                
+                if clean_key != master_key:
+                    st.error("🔴 Доступ запрещён: шифр не признан Стражем Врат Цитадели.")
+                    return
+                
+                # ── СТУПЕНЬ II: Проверка жизнеспособности шлюза ──
+                with st.spinner("⏳ Верификация сокровенного шифра и проверка права доступа..."):
+                    valid, msg = verify_gemini_api_key(clean_key)
+                    if valid:
+                        st.session_state.authenticated = True
+                        st.session_state.gemini_key = clean_key
+                        os.environ["GEMINI_API_KEY"] = clean_key
+                        st.success("✅ Врата распахнуты. Доступ Создателя подтверждён!")
+                        st.toast("✨ Добро пожаловать в обитель диалогов, Лев Николаевич!")
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error("🔴 Ключ признан истинным, однако шлюз Цитадели временно недоступен.")
+
+if not st.session_state.authenticated:
+    render_login_screen()
+    st.stop()
+
 # Рендеринг плавающей нативной панели скролла (через JS для надежного скроллинга)
 st.markdown("""
 <div class="page-scroll-container">
@@ -396,9 +626,19 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Заголовки на главной странице
-st.markdown("<div class='title-text'>Shekinah AI Portal</div>", unsafe_allow_html=True)
-st.markdown("<div class='subtitle-text'>Интеллектуальная Обитель Цитадели Духа — Мультипровайдерный Диалог</div>", unsafe_allow_html=True)
+# Заголовки на главной странице (центрированные с сияющими словами и оранжево-бирюзовым слоганом)
+st.markdown("""
+<div style="text-align: center; margin-top: 10px; margin-bottom: 25px; width: 100%;">
+    <h1 class="login-title" style="font-size: 2.8rem; margin-bottom: 8px;">
+        <span class="word-shekinah">Shekinah</span>
+        <span class="word-ai">AI</span>
+        <span class="word-portal">Portal</span>
+    </h1>
+    <p class="login-subtitle" style="margin: 0 auto; max-width: 780px; font-size: 1.12rem;">
+        Интеллектуальная Обитель Цитадели Духа — Мультипровайдерный Диалог
+    </p>
+</div>
+""", unsafe_allow_html=True)
 
 # Если боковая панель свернута, показываем кнопку для ее развертывания
 if st.session_state.sidebar_state == "collapsed":
@@ -448,9 +688,9 @@ st.sidebar.markdown("<div style='margin-top: -10px; margin-bottom: 10px;'></div>
 # Разделяем боковую панель на вкладки
 tab_settings, tab_chats = st.sidebar.tabs(["🏛️ Настройки", "💬 Архивы"])
 
-gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-anthropic_key = os.getenv("ANTHROPIC_API_KEY")
-mistral_key = os.getenv("MISTRAL_API_KEY")
+gemini_key = st.session_state.get("gemini_key") or get_secret("GEMINI_API_KEY") or get_secret("GOOGLE_API_KEY")
+anthropic_key = get_secret("ANTHROPIC_API_KEY")
+mistral_key = get_secret("MISTRAL_API_KEY")
 
 # Дефолтные списки моделей на случай сбоя API
 DEFAULT_GEMINI_MODELS = {
@@ -697,6 +937,16 @@ with tab_settings:
         key="btn_download_md",
         help="Скачать хронологию текущей беседы в красивом Markdown-файле"
     )
+
+    st.divider()
+    if bridge.is_active:
+        st.caption("🟢 **Convex DB**: Облачная синхронизация активна")
+    else:
+        st.caption("🟡 **Convex DB**: Автономный In-Memory режим")
+        
+    if st.button("🚪 Выйти из системы", use_container_width=True, key="btn_logout", help="Завершить сессию и заблокировать вход"):
+        st.session_state.authenticated = False
+        st.rerun()
 
 with tab_chats:
     st.markdown("<h3 style='font-family: \"Outfit\", sans-serif; color: #f8fafc; font-size: 1.1rem; font-weight: 600; margin-top: 10px; margin-bottom: 10px;'>💬 Ваши диалоги</h3>", unsafe_allow_html=True)
