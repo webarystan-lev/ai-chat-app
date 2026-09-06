@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 
 import streamlit as st
+import streamlit.components.v1 as components
 from providers import anthropic_client, gemini_client, mistral_client
 from providers.convex_client import ConvexBridge
 from providers.security import verify_gemini_api_key, sanitize_markdown, get_secret
@@ -77,120 +78,7 @@ if "sidebar_state" not in st.session_state:
 if "sidebar_action" not in st.session_state:
     st.session_state.sidebar_action = None
 
-# Инициализируем мост интеграции с Convex DB
-if "convex_bridge" not in st.session_state:
-    st.session_state.convex_bridge = ConvexBridge()
-bridge = st.session_state.convex_bridge
-
-# Инициализируем структуру мультичатовости в оперативной памяти с поддержкой Convex DB
-if "chats" not in st.session_state:
-    if bridge.is_active:
-        loaded_chats = bridge.load_all_chats()
-        if loaded_chats:
-            st.session_state.chats = loaded_chats
-            st.session_state.current_chat_id = list(loaded_chats.keys())[0]
-            st.toast("📜 Все свитки диалогов успешно восстановлены из Convex DB!")
-        else:
-            st.session_state.chats = {}
-    else:
-        st.session_state.chats = {}
-
-if "current_chat_id" not in st.session_state:
-    st.session_state.current_chat_id = None
-
-# Если у нас осталась старая плоская история messages, перенесем ее в отдельный чат
-if "messages" in st.session_state and st.session_state.messages and not st.session_state.chats:
-    default_id = str(uuid.uuid4())
-    st.session_state.chats[default_id] = {
-        "id": default_id,
-        "title": "Предыдущий диалог",
-        "messages": st.session_state.messages,
-        "provider": "Google Gemini",
-        "model": "gemini-2.5-flash",
-        "system_prompt": DEFAULT_SYSTEM,
-        "temperature": 0.7,
-        "max_tokens": 4096,
-    }
-    st.session_state.current_chat_id = default_id
-    if bridge.is_active:
-        bridge.save_chat(default_id, st.session_state.chats[default_id])
-        for msg in st.session_state.messages:
-            bridge.add_message(default_id, msg)
-
-# Если чатов нет вообще (первый запуск), создаем первый чат
-if not st.session_state.chats:
-    default_id = str(uuid.uuid4())
-    st.session_state.chats[default_id] = {
-        "id": default_id,
-        "title": "🏛️ Новый диалог",
-        "messages": [],
-        "provider": "Google Gemini",
-        "model": "gemini-2.5-flash",
-        "system_prompt": DEFAULT_SYSTEM,
-        "temperature": 0.7,
-        "max_tokens": 4096,
-    }
-    st.session_state.current_chat_id = default_id
-    if bridge.is_active:
-        bridge.save_chat(default_id, st.session_state.chats[default_id])
-
-# Всегда поддерживаем st.session_state.messages синхронизированным с текущим активным чатом
-current_chat = st.session_state.chats[st.session_state.current_chat_id]
-st.session_state.messages = current_chat["messages"]
-
-# Инициализация/синхронизация состояния виджетов настроек с текущим активным чатом
-if "prev_chat_id" not in st.session_state:
-    st.session_state.prev_chat_id = st.session_state.current_chat_id
-    st.session_state["w_provider"] = current_chat.get("provider", "Google Gemini")
-    st.session_state["w_model"] = current_chat.get("model", "gemini-2.5-flash")
-    st.session_state["w_temperature"] = float(current_chat.get("temperature", 0.7))
-    st.session_state["w_max_tokens"] = int(current_chat.get("max_tokens", 4096))
-    st.session_state["w_system_prompt"] = current_chat.get("system_prompt", DEFAULT_SYSTEM)
-
-# Если чат переключился в Архивах, принудительно обновляем виджеты в session_state
-if st.session_state.prev_chat_id != st.session_state.current_chat_id:
-    c_chat = st.session_state.chats[st.session_state.current_chat_id]
-    st.session_state["w_provider"] = c_chat.get("provider", "Google Gemini")
-    st.session_state["w_model"] = c_chat.get("model", "gemini-2.5-flash")
-    st.session_state["w_temperature"] = float(c_chat.get("temperature", 0.7))
-    st.session_state["w_max_tokens"] = int(c_chat.get("max_tokens", 4096))
-    st.session_state["w_system_prompt"] = c_chat.get("system_prompt", DEFAULT_SYSTEM)
-    st.session_state.last_w_provider = c_chat.get("provider", "Google Gemini")  # Избегаем ложного срабатывания сброса модели
-    st.session_state.prev_chat_id = st.session_state.current_chat_id
-
-# Инициализируем last_w_provider для отслеживания ручной смены провайдера пользователем
-if "last_w_provider" not in st.session_state:
-    st.session_state.last_w_provider = st.session_state["w_provider"]
-
-# Если пользователь вручную сменил провайдера в боковой панели, корректируем модель на дефолтную
-if st.session_state.last_w_provider != st.session_state["w_provider"]:
-    new_prov = st.session_state["w_provider"]
-    if new_prov == "Google Gemini":
-        st.session_state["w_model"] = "gemini-2.5-flash"
-    elif new_prov == "Anthropic (Claude)":
-        st.session_state["w_model"] = "claude-3-5-sonnet-20240620"
-    else:
-        st.session_state["w_model"] = "mistral-small-latest"
-    st.session_state.last_w_provider = new_prov
-
-
-# Хранилище динамических списков моделей в рамках сессии конкретного пользователя
-if "gemini_models" not in st.session_state:
-    st.session_state.gemini_models = None
-if "anthropic_models" not in st.session_state:
-    st.session_state.anthropic_models = None
-if "mistral_models" not in st.session_state:
-    st.session_state.mistral_models = None
-
-# Устанавливаем конфигурацию страницы с премиальным заголовком и иконкой
-st.set_page_config(
-    page_title="Shekinah AI Portal — Цитадель Духа",
-    page_icon="🏛️",
-    layout="wide",
-    initial_sidebar_state=st.session_state.sidebar_state
-)
-
-# Внедряем премиальный CSS стиль для атмосферы строгой темной Цитадели
+# Внедряем премиальный CSS стиль ДО авторизации — чтобы экран входа был красивым
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700;800&display=swap');
@@ -206,158 +94,6 @@ st.markdown("""
     [data-testid="stSidebar"] {
         background-color: #0f172a !important;
         border-right: 1px solid #1e293b !important;
-    }
-
-    /* Стилизация заголовков */
-    .title-text {
-        font-family: 'Outfit', sans-serif;
-        background: linear-gradient(135deg, #c084fc 0%, #3b82f6 50%, #60a5fa 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        font-weight: 800;
-        font-size: 2.8rem;
-        margin-bottom: 0.2rem;
-        text-shadow: 0 0 20px rgba(168, 85, 247, 0.2);
-        text-align: center !important;
-    }
-
-    .subtitle-text {
-        font-family: 'Inter', sans-serif;
-        color: #94a3b8;
-        font-size: 1.1rem;
-        margin-bottom: 2rem;
-        font-weight: 300;
-        letter-spacing: 0.5px;
-        text-align: center !important;
-    }
-
-    /* Стильные карточки сообщений */
-    .stChatMessage {
-        background-color: #111827 !important;
-        border: 1px solid #1e293b !important;
-        border-radius: 14px !important;
-        padding: 16px !important;
-        margin-bottom: 4px !important;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-    }
-
-    [data-testid="stChatMessageUser"] {
-        background-color: #1e1b4b !important;
-        border-left: 4px solid #818cf8 !important;
-    }
-
-    [data-testid="stChatMessageAssistant"] {
-        background-color: #0f172a !important;
-        border-left: 4px solid #3b82f6 !important;
-    }
-
-    /* Кнопки копирования под сообщениями */
-    .stButton>button {
-        background: #1e293b !important;
-        color: #94a3b8 !important;
-        border: 1px solid #334155 !important;
-        border-radius: 6px !important;
-        padding: 4px 12px !important;
-        font-size: 0.85rem !important;
-        transition: all 0.2s ease-in-out !important;
-        margin-top: 5px !important;
-        margin-bottom: 15px !important;
-    }
-
-    .stButton>button:hover {
-        background: #3b82f6 !important;
-        color: white !important;
-        border-color: #3b82f6 !important;
-    }
-
-    /* ПАНЕЛЬ СКРОЛЛИНГА СТРАНИЦЫ (ЧЕРЕЗ ЯКОРЯ) */
-    .page-scroll-container {
-        position: fixed;
-        bottom: 80px;
-        right: 25px;
-        z-index: 9999;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-    }
-
-    .scroll-anchor-btn {
-        background-color: #1e293b;
-        color: #f1f5f9;
-        border: 1px solid #334155;
-        width: 46px;
-        height: 46px;
-        border-radius: 50%;
-        font-size: 1.1rem;
-        text-decoration: none;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-        transition: all 0.2s ease-in-out;
-    }
-
-    .scroll-anchor-btn:hover {
-        background-color: #3b82f6;
-        color: white;
-        border-color: #3b82f6;
-        transform: scale(1.1);
-    }
-
-    /* Кнопки навигации чата */
-    .chat-nav-link {
-        display: block;
-        text-align: center;
-        width: 100%;
-        padding: 8px;
-        background: #1e293b;
-        color: #94a3b8;
-        border: 1px solid #334155;
-        border-radius: 6px;
-        text-decoration: none;
-        font-size: 0.9rem;
-        transition: all 0.2s;
-    }
-    .chat-nav-link:hover {
-        background: #3b82f6;
-        color: white;
-        border-color: #3b82f6;
-    }
-
-    /* СТИЛИЗАЦИЯ ДЛЯ БЛОКА РАЗМЫШЛЕНИЙ (SPOILER) */
-    .thinking-container {
-        background-color: #0f172a;
-        border: 1px dashed #3b82f6;
-        border-radius: 8px;
-        padding: 12px;
-        margin-bottom: 12px;
-    }
-
-    .thinking-summary {
-        font-weight: 600;
-        color: #3b82f6;
-        cursor: pointer;
-        outline: none;
-        user-select: none;
-    }
-
-    .thinking-content {
-        margin-top: 8px;
-        color: #94a3b8;
-        font-style: italic;
-        font-size: 0.95rem;
-        border-left: 2px solid #334155;
-        padding-left: 10px;
-    }
-
-    @keyframes spin {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
-    }
-
-    .spinning-icon {
-        display: inline-block;
-        animation: spin 2s linear infinite;
     }
 
     /* ─── АВТОРИЗАЦИЯ И СИЯЮЩИЕ ЗАГОЛОВКИ ЦИТАДЕЛИ ─── */
@@ -521,37 +257,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# JS-мост для динамического управления интерфейсом (сворачивание боковой панели и жесткая перезагрузка)
-if st.session_state.sidebar_action:
-    action = st.session_state.sidebar_action
-    st.session_state.sidebar_action = None
-    import streamlit.components.v1 as components
-    components.html(f"""
-        <script>
-        const doc = window.parent.document;
-        if ("{action}" === "collapse") {{
-            const sidebar = doc.querySelector('section[data-testid="stSidebar"]');
-            if (sidebar) {{
-                const closeBtn = sidebar.querySelector('button[aria-label="Close sidebar"]') || 
-                                 sidebar.querySelector('button[aria-label="Close"]') || 
-                                 sidebar.querySelector('button');
-                if (closeBtn) closeBtn.click();
-            }}
-        }} else if ("{action}" === "expand") {{
-            const expandBtn = doc.querySelector('[data-testid="collapsedControl"]');
-            if (expandBtn) expandBtn.click();
-        }} else if ("{action}" === "hard_reload") {{
-            window.parent.localStorage.clear();
-            window.parent.sessionStorage.clear();
-            window.parent.location.reload(true);
-        }}
-        </script>
-    """, height=0, width=0)
-
-# ⚓ Самый верхний якорь всей страницы
-st.markdown("<div id='top_anchor'></div>", unsafe_allow_html=True)
-
-# ─── АВТОРИЗАЦИЯ И СТРАЖ ВРАТ ЦИТАДЕЛИ (ТОЛЬКО ПО GEMINI_API_KEY) ───
+# ─── АВТОРИЗАЦИЯ И СТРАЖ ВРАТ ЦИТАДЕЛИ (ТОЛЬКО ПО GEMINI_API_KEY) — ПЕРВАЯ СТРОКА ЗАЩИТЫ ───
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
@@ -615,8 +321,158 @@ def render_login_screen():
                         st.error("🔴 Ключ признан истинным, однако шлюз Цитадели временно недоступен.")
 
 if not st.session_state.authenticated:
+    # Устанавливаем конфигурацию страницы для экрана входа
+    st.set_page_config(
+        page_title="Shekinah AI Portal — Цитадель Духа",
+        page_icon="🏛️",
+        layout="wide",
+        initial_sidebar_state="collapsed"
+    )
     render_login_screen()
     st.stop()
+
+# ─── ПОСЛЕ УСПЕШНОЙ АВТОРИЗАЦИИ: ИНИЦИАЛИЗАЦИЯ CONVEX И ЧАТОВ ───
+# Инициализируем мост интеграции с Convex DB
+if "convex_bridge" not in st.session_state:
+    st.session_state.convex_bridge = ConvexBridge()
+bridge = st.session_state.convex_bridge
+
+# Инициализируем структуру мультичатовости в оперативной памяти с поддержкой Convex DB
+if "chats" not in st.session_state:
+    if bridge.is_active:
+        loaded_chats = bridge.load_all_chats()
+        if loaded_chats:
+            st.session_state.chats = loaded_chats
+            st.session_state.current_chat_id = list(loaded_chats.keys())[0]
+            st.toast("📜 Все свитки диалогов успешно восстановлены из Convex DB!")
+        else:
+            st.session_state.chats = {}
+    else:
+        st.session_state.chats = {}
+
+if "current_chat_id" not in st.session_state:
+    st.session_state.current_chat_id = None
+
+# Если у нас осталась старая плоская история messages, перенесем ее в отдельный чат
+if "messages" in st.session_state and st.session_state.messages and not st.session_state.chats:
+    default_id = str(uuid.uuid4())
+    st.session_state.chats[default_id] = {
+        "id": default_id,
+        "title": "Предыдущий диалог",
+        "messages": st.session_state.messages,
+        "provider": "Google Gemini",
+        "model": "gemini-2.5-flash",
+        "system_prompt": DEFAULT_SYSTEM,
+        "temperature": 0.7,
+        "max_tokens": 4096,
+    }
+    st.session_state.current_chat_id = default_id
+    if bridge.is_active:
+        bridge.save_chat(default_id, st.session_state.chats[default_id])
+        for msg in st.session_state.messages:
+            bridge.add_message(default_id, msg)
+
+# Если чатов нет вообще (первый запуск), создаем первый чат
+if not st.session_state.chats:
+    default_id = str(uuid.uuid4())
+    st.session_state.chats[default_id] = {
+        "id": default_id,
+        "title": "🏛️ Новый диалог",
+        "messages": [],
+        "provider": "Google Gemini",
+        "model": "gemini-2.5-flash",
+        "system_prompt": DEFAULT_SYSTEM,
+        "temperature": 0.7,
+        "max_tokens": 4096,
+    }
+    st.session_state.current_chat_id = default_id
+    if bridge.is_active:
+        bridge.save_chat(default_id, st.session_state.chats[default_id])
+
+# Всегда поддерживаем st.session_state.messages синхронизированным с текущим активным чатом
+current_chat = st.session_state.chats[st.session_state.current_chat_id]
+st.session_state.messages = current_chat["messages"]
+
+# Инициализация/синхронизация состояния виджетов настроек с текущим активным чатом
+if "prev_chat_id" not in st.session_state:
+    st.session_state.prev_chat_id = st.session_state.current_chat_id
+    st.session_state["w_provider"] = current_chat.get("provider", "Google Gemini")
+    st.session_state["w_model"] = current_chat.get("model", "gemini-2.5-flash")
+    st.session_state["w_temperature"] = float(current_chat.get("temperature", 0.7))
+    st.session_state["w_max_tokens"] = int(current_chat.get("max_tokens", 4096))
+    st.session_state["w_system_prompt"] = current_chat.get("system_prompt", DEFAULT_SYSTEM)
+
+# Если чат переключился в Архивах, принудительно обновляем виджеты в session_state
+if st.session_state.prev_chat_id != st.session_state.current_chat_id:
+    c_chat = st.session_state.chats[st.session_state.current_chat_id]
+    st.session_state["w_provider"] = c_chat.get("provider", "Google Gemini")
+    st.session_state["w_model"] = c_chat.get("model", "gemini-2.5-flash")
+    st.session_state["w_temperature"] = float(c_chat.get("temperature", 0.7))
+    st.session_state["w_max_tokens"] = int(c_chat.get("max_tokens", 4096))
+    st.session_state["w_system_prompt"] = c_chat.get("system_prompt", DEFAULT_SYSTEM)
+    st.session_state.last_w_provider = c_chat.get("provider", "Google Gemini")  # Избегаем ложного срабатывания сброса модели
+    st.session_state.prev_chat_id = st.session_state.current_chat_id
+
+# Инициализируем last_w_provider для отслеживания ручной смены провайдера пользователем
+if "last_w_provider" not in st.session_state:
+    st.session_state.last_w_provider = st.session_state["w_provider"]
+
+# Если пользователь вручную сменил провайдера в боковой панели, корректируем модель на дефолтную
+if st.session_state.last_w_provider != st.session_state["w_provider"]:
+    new_prov = st.session_state["w_provider"]
+    if new_prov == "Google Gemini":
+        st.session_state["w_model"] = "gemini-2.5-flash"
+    elif new_prov == "Anthropic (Claude)":
+        st.session_state["w_model"] = "claude-3-5-sonnet-20240620"
+    else:
+        st.session_state["w_model"] = "mistral-small-latest"
+    st.session_state.last_w_provider = new_prov
+
+
+# Хранилище динамических списков моделей в рамках сессии конкретного пользователя
+if "gemini_models" not in st.session_state:
+    st.session_state.gemini_models = None
+if "anthropic_models" not in st.session_state:
+    st.session_state.anthropic_models = None
+if "mistral_models" not in st.session_state:
+    st.session_state.mistral_models = None
+
+# Устанавливаем конфигурацию страницы для основного интерфейса
+st.set_page_config(
+    page_title="Shekinah AI Portal — Цитадель Духа",
+    page_icon="🏛️",
+    layout="wide",
+    initial_sidebar_state=st.session_state.sidebar_state
+)
+
+# JS-мост для динамического управления интерфейсом (сворачивание боковой панели, жесткая перезагрузка, сохранение active chat_id)
+if st.session_state.sidebar_action:
+    action = st.session_state.sidebar_action
+    st.session_state.sidebar_action = None
+    components.html(f"""
+        <script>
+        const doc = window.parent.document;
+        if ("{action}" === "collapse") {{
+            const sidebar = doc.querySelector('section[data-testid="stSidebar"]');
+            if (sidebar) {{
+                const closeBtn = sidebar.querySelector('button[aria-label="Close sidebar"]') || 
+                                 sidebar.querySelector('button[aria-label="Close"]') || 
+                                 sidebar.querySelector('button');
+                if (closeBtn) closeBtn.click();
+            }}
+        }} else if ("{action}" === "expand") {{
+            const expandBtn = doc.querySelector('[data-testid="collapsedControl"]');
+            if (expandBtn) expandBtn.click();
+        }} else if ("{action}" === "hard_reload") {{
+            window.parent.localStorage.clear();
+            window.parent.sessionStorage.clear();
+            window.parent.location.reload(true);
+        }}
+        </script>
+    """, height=0, width=0)
+
+# ⚓ Самый верхний якорь всей страницы
+st.markdown("<div id='top_anchor'></div>", unsafe_allow_html=True)
 
 # Рендеринг плавающей нативной панели скролла (через JS для надежного скроллинга)
 st.markdown("""
@@ -1160,7 +1016,7 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "user"
             elif gen_provider == "Anthropic (Claude)":
                 generator = anthropic_client.stream_anthropic(messages=messages_to_send, model_name=gen_model, temperature=gen_temperature, max_tokens=gen_max_tokens)
             else:
-                generator = mistral_client.stream_mistral(messages=messages_to_send, model_name=gen_model, temperature=gen_temperature, max_tokens=gen_max_tokens)
+                generator = mistral_client.stream_mistral(messages=messages_to_send, model_name=gen_model, temperature=gen_temperature, max_tokens=gen_max_tokens, system_prompt=gen_system_prompt)
 
             for chunk in generator:
                 full_response += chunk
