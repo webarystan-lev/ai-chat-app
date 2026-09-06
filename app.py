@@ -448,22 +448,24 @@ st.sidebar.markdown("<div style='margin-top: -10px; margin-bottom: 10px;'></div>
 # Разделяем боковую панель на вкладки
 tab_settings, tab_chats = st.sidebar.tabs(["🏛️ Настройки", "💬 Архивы"])
 
-gemini_key = os.getenv("GEMINI_API_KEY")
+gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 anthropic_key = os.getenv("ANTHROPIC_API_KEY")
 mistral_key = os.getenv("MISTRAL_API_KEY")
 
 # Дефолтные списки моделей на случай сбоя API
 DEFAULT_GEMINI_MODELS = {
     "gemini-2.5-flash": "Gemini 2.5 Flash (Рекомендуемая)",
+    "gemini-2.5-pro": "Gemini 2.5 Pro (Верховный ИИ-Архитектор)",
     "gemini-2.5-flash-lite": "Gemini 2.5 Flash Lite (Оптимизированная)",
-    "gemini-3-flash-preview": "Gemini 3 Flash Preview (Экспериментальная)",
     "gemini-3.5-flash": "Gemini 3.5 Flash (Новое поколение)",
+    "gemini-3.6-flash": "Gemini 3.6 Flash (Академический Соратник)",
+    "gemini-3-flash-preview": "Gemini 3 Flash Preview (Экспериментальная)",
+    "gemini-3.1-flash-lite": "Gemini 3.1 Flash Lite (Хранитель Малого Логоса)",
     "gemma-4-31b-it": "Gemma 4 31B IT (Google Open Model)",
     "gemma-4-26b-a4b-it": "Gemma 4 26B A4B IT (Многоязычная)",
     "gemini-flash-latest": "Gemini Flash Latest (Стремительный Вестник)",
     "gemini-flash-lite-latest": "Gemini Flash-Lite Latest (Молниеносный Послушник)",
-    "gemini-3.1-flash-lite-preview": "Gemini 3.1 Flash Lite Preview (Вещий Вестник)",
-    "gemini-3.1-flash-lite": "Gemini 3.1 Flash Lite (Хранитель Малого Логоса)"
+    "gemini-3.1-flash-lite-preview": "Gemini 3.1 Flash Lite Preview (Вещий Вестник)"
 }
 
 DEFAULT_ANTHROPIC_MODELS = {
